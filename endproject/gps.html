@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Location Access</title>
+    <style>
+        body {
+            font-family: cursive;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        #getLocation {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #getLocation:hover {
+            background-color: #0056b3;
+        }
+        #locationInfo {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        #randomCoordinates {
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Location Access Example</h1>
+    <button id="getLocation">Get Location</button>
+    <div id="locationInfo"></div>
+    <div id="randomCoordinates">
+        <canvas id="coordinatesCanvas" width="300" height="100"></canvas>
+    </div>
+
+    <img src="">
+
+    <script>
+        document.getElementById('getLocation').addEventListener('click', function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(showPosition, showError);
+            } else {
+                document.getElementById('locationInfo').innerHTML = "Geolocation is not supported by this browser.";
+            }
+        });
+
+        function showPosition(position) {
+            document.getElementById('locationInfo').innerHTML = "Latitude: " + position.coords.latitude + 
+            "<br>Longitude: " + position.coords.longitude;
+        }
+
+        function showError(error) {
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    document.getElementById('locationInfo').innerHTML = "User  denied the request for Geolocation. Please enable location services.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    document.getElementById('locationInfo').innerHTML = "Location information is unavailable.";
+                    break;
+                case error.TIMEOUT:
+                    document.getElementById('locationInfo').innerHTML = "The request to get user location timed out.";
+                    break;
+                case error.UNKNOWN_ERROR:
+                    document.getElementById('locationInfo').innerHTML = "An unknown error occurred.";
+                    break;
+            }
+        }
+        function generateRandomCoordinates() {
+            const latitude = (Math.random() * 180 - 90).toFixed(6); // Latitude between -90 and 90
+            const longitude = (Math.random() * 360 - 180).toFixed(6); // Longitude between -180 and 180
+            return { latitude, longitude };
+        }
+
+        // Function to draw random coordinates on canvas
+        function drawRandomCoordinates() {
+            const { latitude, longitude } = generateRandomCoordinates();
+            const canvas = document.getElementById('coordinatesCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear previous drawings
+            ctx.fillStyle = 'black';
+            ctx.font = '16px Arial';
+            ctx.fillText(`Lat: ${latitude}, Lon: ${longitude}`, 10, 50);
+        }
+
+        // Generate and draw random coordinates on page load
+        drawRandomCoordinates();
+    </script>
+</body>
+</html>

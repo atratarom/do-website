@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Map Directions</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css" rel="stylesheet" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #map {
+            flex: 1;
+            width: 100%;
+        }
+        .controls {
+            padding: 10px;
+            background: white;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1;
+        }
+        input {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <input type="text" id="start" placeholder="Start Point" />
+        <input type="text" id="destination" placeholder="Destination" />
+        <select id="transportMode">
+            <option value="driving">Driving</option>
+            <option value="walking">Walking</option>
+            <option value="transit">Public Transport</option>
+            <option value="cycling">Cycling</option>
+            <option value="truck">Truck</option>
+        </select>
+        <button id="submit">Get Directions</button>
+        <div id="info" style="margin-top: 10px;"></div>
+    </div>
+    <div id="map"></div>
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoibXV2YXNpIiwiYSI6ImNtOTA5ZXQycTBrODUybnNpeTYwNjlzZ3UifQ.j0OEbMWUD2ye3gE0hhIaAQ';
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v11',
+            center: [-1.28333, 36.81667], // Center of the Kenya
+            zoom: 3
+        });
+
+        const startInput = document.getElementById('start');
+        const destinationInput = document.getElementById('destination');
+        const transportModeSelect = document.getElementById('transportMode');
+        const submitButton = document.getElementById('submit');
+        const infoDiv = document.getElementById('info');
+
+        let startCoords = null;
+        let destinationCoords = null;
+
+        submitButton.addEventListener('click', () => {
+            const start = startInput.value;
+            const destination = destinationInput.value;
+
+            // Clear previous info
+            infoDiv.innerHTML = '';
+
+            // Geocode the start and destination points
+            geocode(start, 'start');
+            geocode(destination, 'destination');
+        });
+
+        function geocode(location, type) {
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(location)}.json?access_token=${mapboxgl.accessToken}`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.features.length > 0) {
+                        const coords = data.features[0].geometry.coordinates;
+                        addMarker(coords, type);
+                        if (type === 'start') {
+                            startCoords = coords;
+                            map.flyTo({ center: coords, zoom: 8 });
+                        } else {
+                            destinationCoords = coords;
+                        }
+
+                        // Draw route if both coordinates are available
+                        if (startCoords && destinationCoords) {
+                            getRoute(startCoords, destinationCoords);
+                        }
+                    } else {
+                        alert('Location not found');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function addMarker(coords, type) {
+            const marker = new mapboxgl.Marker({ color: type === 'start' ? 'green' : 'red' })
+                .setLngLat(coords)
+                .addTo(map);
+        }
+
+        function getRoute(start, destination) {
+            const mode = transportModeSelect.value; // Get selected transport mode
+            const url = `https://api.mapbox.com/directions/v5/mapbox/${mode}/${start[0]},${start[1]};${destination[0]},${destination[1]}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.routes.length > 0) {
+                        const route = data.routes[0].geometry.coordinates;
+                        const distance = data.routes[0].distance / 1000; // Convert to kilometers
+                        const duration = data.routes[0].duration / 60; // Convert to minutes
+                        drawRoute(route);
+                        displayInfo(distance, duration);
+                    } else {
+                        alert('Route not found');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    infoDiv.innerHTML = 'Please use a different mean of transport.';
+                });
+        }
+
+        function drawRoute(route) {
+            const line = {
+                type: 'Feature',
+                geometry: {
+                    type: 'LineString',
+                    coordinates: route
+                }
+            };
+
+            if (map.getSource('route')) {
+                map.getSource('route').setData(line);
+            } else {
+                map.addSource('route', {
+                    type: 'geojson',
+                    data: line
+                });
+
+                map.addLayer({
+                    id: 'route',
+                    type: 'line',
+                    source: 'route',
+                    layout: {
+                        'line-join': 'round',
+                        'line-cap': 'round'
+                    },
+                    paint: {
+                        'line-color': '#888',
+                        'line-width': 4
+                    }
+                });
+            }
+        }
+
+        function displayInfo(distance, duration) {
+            infoDiv.innerHTML = `Distance: ${distance.toFixed(2)} km<br>Estimated Duration: ${duration.toFixed(2)} minutes`;
+            saveRouteData(startInput.value, destinationInput.value, transportModeSelect.value, distance, duration);
+        }
+
+        function saveRouteData(startPoint, destinationPoint, transportMode, distance, duration) {
+            const data = new URLSearchParams();
+            data.append('start_point', startPoint);
+            data.append('destination_point', destinationPoint);
+            data.append('transport_mode', transportMode);
+            data.append('distance', distance);
+            data.append('duration', duration);
+
+            fetch('datb.php', {
+                method: 'POST',
+                body: data
+            })
+            .then(response => response.text())
+            .then(data => {
+                console.log(data); // Log the response from the PHP script
+            })
+            .catch(error => {
+                console.error('Error saving route data:', error);
+            });
+        }
+
+    </script>
+</body>
+</html>
